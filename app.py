@@ -22,6 +22,10 @@ def load_data():
     df_asset = pd.read_csv(asset_url)
     df_expense = pd.read_csv(expense_url)
 
+    # 列名の前後にある余計な空白を削除
+    df_asset.columns = df_asset.columns.str.strip()
+    df_expense.columns = df_expense.columns.str.strip()
+
     # 資産データの数値クリーニング
     for col in df_asset.columns:
         if col != "年月":
@@ -59,9 +63,12 @@ tab1, tab2 = st.tabs(["資産推移", "支出分析"])
 with tab1:
     st.header("資産推移")
     latest_asset = df_asset.dropna(subset=["年月"]).iloc[-1]
+
+    # 合計列の安全な取得
+    total_asset = latest_asset.get("合計", 0)
     st.metric(
         label=f"最新総資産 ({latest_asset['年月']})",
-        value=f"{int(latest_asset['合計']):,} 円",
+        value=f"{int(total_asset):,} 円",
     )
 
     asset_cols = [
@@ -86,10 +93,12 @@ with tab2:
     # 最新月のサマリー表示
     latest_exp = df_expense.dropna(subset=["年月"]).iloc[-1]
     col1, col2 = st.columns(2)
+
+    total_exp = latest_exp.get("合計", 0)
     with col1:
         st.metric(
             label=f"最新月の支出合計 ({latest_exp['年月']})",
-            value=f"{int(latest_exp['合計']):,} 円",
+            value=f"{int(total_exp):,} 円",
         )
     with col2:
         if "住宅ローン" in latest_exp:
@@ -97,8 +106,8 @@ with tab2:
                 label="住宅ローン", value=f"{int(latest_exp['住宅ローン']):,} 円"
             )
 
-    # 分析対象とする費目のリスト（合計や収入、特殊な列を除外）
-    expense_cols = [
+    # 分析対象とする費目のリスト（実データに存在する列のみ動的抽出）
+    candidate_cols = [
         "家賃",
         "食費",
         "生活日用品",
@@ -109,34 +118,33 @@ with tab2:
         "保険料",
         "衣服・美容",
     ]
-    # 実データに存在する列だけに絞り込み
-    expense_cols = [c for c in expense_cols if c in df_expense.columns]
+    expense_cols = [c for c in candidate_cols if c in df_expense.columns]
 
     # 1. 月別支出内訳の積み上げ棒グラフ
-    fig_exp_bar = px.bar(
-        df_expense,
-        x="年月",
-        y=expense_cols,
-        title="月別支出内訳の推移",
-        barmode="stack",
-    )
-    st.plotly_chart(fig_exp_bar, use_container_width=True)
+    if expense_cols:
+        fig_exp_bar = px.bar(
+            df_expense,
+            x="年月",
+            y=expense_cols,
+            title="月別支出内訳の推移",
+            barmode="stack",
+        )
+        st.plotly_chart(fig_exp_bar, use_container_width=True)
 
-    # 2. 最新月の支出割合（円グラフ）
-    latest_data = (
-        latest_exp[expense_cols].reset_index()
-    )
-    latest_data.columns = ["費目", "金額"]
-    latest_data = latest_data[latest_data["金額"] > 0]  # 0円より大きい費目のみ表示
+        # 2. 最新月の支出割合（円グラフ）
+        latest_data = latest_exp[expense_cols].reset_index()
+        latest_data.columns = ["費目", "金額"]
+        latest_data = latest_data[latest_data["金額"] > 0]
 
-    fig_pie = px.pie(
-        latest_data,
-        values="金額",
-        names="費目",
-        title=f"最新月 ({latest_exp['年月']}) の支出内訳割合",
-        hole=0.4,
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+        if not latest_data.empty:
+            fig_pie = px.pie(
+                latest_data,
+                values="金額",
+                names="費目",
+                title=f"最新月 ({latest_exp['年月']}) の支出内訳割合",
+                hole=0.4,
+            )
+            st.plotly_chart(fig_pie, use_container_width=True)
 
     # 3. 元データ一覧
     with st.expander("月別費用データ一覧を見る"):
