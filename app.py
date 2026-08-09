@@ -1,3 +1,4 @@
+from urllib.parse import quote
 import pandas as pd
 import plotly.express as px
 import streamlit as st
@@ -11,8 +12,12 @@ st.title("資産管理 & 家計ダッシュボード")
 def load_data():
     sheet_id = "1cG-Oa2sYQJlaD3MV1kf6YK-BuF-ayTPki2NvyQiay7c"
 
-    asset_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=資産"
-    expense_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet=月別費用"
+    # 日本語シート名をURLエンコード化
+    sheet_asset = quote("資産")
+    sheet_expense = quote("月別費用")
+
+    asset_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_asset}"
+    expense_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv&sheet={sheet_expense}"
 
     df_asset = pd.read_csv(asset_url)
     df_expense = pd.read_csv(expense_url)
